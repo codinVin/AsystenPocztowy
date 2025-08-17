@@ -2,6 +2,7 @@ import Voice from '@react-native-voice/voice';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+//g
 
 export default function HomeScreen() {
   const [statusText, setStatusText] = useState('Naciśnij przycisk i mów');

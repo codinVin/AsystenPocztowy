@@ -1,61 +1,101 @@
+import Voice from '@react-native-voice/voice';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
-import { Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
-// Nazwa komponentu może być dowolna, ale Expo Router oczekuje, że będzie to domyślny eksport.
 export default function HomeScreen() {
-  // Stan do przechowywania tekstu wyświetlanego na ekranie
-  // Odpowiednik @State w SwiftUI
-  const [statusText, setStatusText] = useState('Czekam na polecenie...');
+  const [statusText, setStatusText] = useState('Naciśnij przycisk i mów');
+  const [recognizedText, setRecognizedText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState('');
 
-  // Efekt, który uruchamia się tylko raz, gdy ekran się załaduje
-  // Odpowiednik .onAppear w SwiftUI
-  useEffect(() => {
-    const greeting = "Dzień dobry! Co dzisiaj robimy?";
-    
-    // Używamy biblioteki expo-speech do wypowiedzenia tekstu
-    Speech.speak(greeting, { language: 'pl-PL' }); // Używamy 'pl-PL' dla lepszej kompatybilności
-  }, []); // Pusta tablica [] oznacza, że efekt uruchomi się tylko raz
-
-  // Funkcja obsługująca naciśnięcie przycisku
-  const handlePress = () => {
-    setStatusText('Teraz bym Cię słuchał...');
-    // Prosta symulacja resetowania statusu po 2 sekundach
-    setTimeout(() => {
-      setStatusText('Czekam na polecenie...');
-    }, 2000);
+  // --- Funkcje obsługujące zdarzenia z biblioteki Voice ---
+  const onSpeechStart = (e: any) => {
+    console.log('Rozpoczęto nasłuchiwanie...', e);
+    setStatusText('Słucham...');
+    setIsListening(true);
   };
 
-  // To jest to, co renderuje się na ekranie (odpowiednik funkcji render() w React lub body w SwiftUI)
+  const onSpeechEnd = (e: any) => {
+    console.log('Zakończono nasłuchiwanie.', e);
+    setStatusText('Naciśnij przycisk i mów');
+    setIsListening(false);
+  };
+
+  const onSpeechError = (e: any) => {
+    console.log('Błąd rozpoznawania mowy!', e);
+    setError(JSON.stringify(e.error));
+    setIsListening(false);
+  };
+
+  const onSpeechResults = (e: any) => {
+    console.log('Otrzymano wyniki:', e);
+    if (e.value && e.value.length > 0) {
+      setRecognizedText(e.value[0]);
+    }
+  };
+  // ---------------------------------------------------------
+
+  useEffect(() => {
+    // Ustawienie nasłuchiwania na zdarzenia z biblioteki Voice
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechError = onSpeechError;
+    Voice.onSpeechResults = onSpeechResults;
+
+    // Powitanie głosowe przy starcie
+    const greeting = "Dzień dobry! Co dzisiaj robimy?";
+    Speech.speak(greeting, { language: 'pl-PL' });
+
+    // Funkcja czyszcząca - usuwa nasłuchiwacze, gdy komponent jest niszczony
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+
+  const startListening = async () => {
+    // Resetujemy stany przed rozpoczęciem
+    setRecognizedText('');
+    setError('');
+    try {
+      await Voice.start('pl-PL'); // Rozpocznij nasłuchiwanie w języku polskim
+    } catch (e) {
+      console.error('Błąd podczas startu nasłuchiwania', e);
+    }
+  };
+
+  const stopListening = async () => {
+    try {
+      await Voice.stop();
+    } catch (e) {
+      console.error('Błąd podczas zatrzymywania nasłuchiwania', e);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>{statusText}</Text>
+        
+        {isListening && <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 20 }} />}
+        
+        <Text style={styles.recognizedText}>{recognizedText}</Text>
+        
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
         <Button 
-          title="Naciśnij i mów" 
-          onPress={handlePress} 
+          title={isListening ? "Zatrzymaj słuchanie" : "Naciśnij i mów"} 
+          onPress={isListening ? stopListening : startListening}
         />
       </View>
     </SafeAreaView>
   );
 }
 
-// Definicja stylów, odpowiednik CSS
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  recognizedText: { fontSize: 18, marginVertical: 20, color: '#333', textAlign: 'center' },
+  errorText: { color: 'red', marginBottom: 20, textAlign: 'center' },
 });
